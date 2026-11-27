@@ -4,7 +4,7 @@ All notable changes to Acuto are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project uses [semantic versioning](https://semver.org/).
 
-## [0.1.0]
+## [0.1.1]
 
 Initial SDK release. The framework includes the contract DSL (`action` /
 `after` / `when` / `ag`), `ContractLibrary` with symbolic verification,
@@ -74,4 +74,4 @@ compaction, recall, checkpoints, and resume.
   request rejected as expired; the request timeout is a setting (180
   seconds by default).
 
-[0.1.0]: https://github.com/yfxiao16/acuto/releases/tag/v0.1.0
+[0.1.1]: https://github.com/yfxiao16/acuto/releases/tag/v0.1.1

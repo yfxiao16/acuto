@@ -1,7 +1,7 @@
 # To do
 
 What the SDK still lacks next to a framework such as LangChain, to be
-taken up after 0.1.0. Nothing here blocks the first release.
+taken up after the first release.
 
 ## Documentation
 
@@ -15,7 +15,7 @@ taken up after 0.1.0. Nothing here blocks the first release.
       covered by semantic versioning from 1.0, and how deprecations are
       announced.
 
-## Long runs (in 0.1.0)
+## Long runs
 
 - [ ] Forking a checkpoint at an earlier step.
 - [ ] Periodic snapshots, to bound replay time on very long runs.

@@ -13,7 +13,7 @@ runs.
 
 Acuto (Agentic Contract-based Runtime Orchestration) is a symbolic
 control layer for LLM agents. A library of assume-guarantee contracts in
-ALTL<sub>f</sub> over the tool-call trace, compiles to deterministic
+ALTL<sub>f</sub> over the tool-call trace compiles to deterministic
 automata whose joint state the framework walks as a residual policy
 graph: each node carries the tools the contracts still admit and, when
 only one remains, the call itself. Three mechanisms read that graph
@@ -25,21 +25,14 @@ the framework scheduled it, and every result before the model sees it.
 Acuto drives the agent loop itself, so the guarantee holds by
 construction: every executed action crosses the same boundary.
 
-Acuto is the control sibling of
-[ContrAgent](https://github.com/SponsioLabs/ContrAgent), which supervises
-an agent's calls from outside; Acuto turns the same contracts into the
-action space.
-
 ## Installation
 
 ```bash
 pip install acuto                # Python 3.10+
 ```
 
-Acuto builds on [ContrAgent](https://pypi.org/project/contragent/), the
-contract kernel (formulas, monitors, event grounding), installed with it;
-there is no other dependency. To work on Acuto itself, clone this
-repository and run:
+`pip` installs the `contragent` runtime dependency automatically. To
+work on Acuto itself, clone this repository and run:
 
 ```bash
 pip install -e ".[dev]"
@@ -178,8 +171,7 @@ while True:
 - [SDK reference](https://github.com/yfxiao16/acuto/blob/main/docs/SDK.md): the public surface in three tiers, the
   contract DSL, where a contract library lives, flows, model adapters,
   and the extension points.
-- [Design](https://github.com/yfxiao16/acuto/blob/main/docs/DESIGN.md): the architecture and what is reused from
-  ContrAgent.
+- [Design](https://github.com/yfxiao16/acuto/blob/main/docs/DESIGN.md) covers the runtime architecture.
 
 ## Citation
 

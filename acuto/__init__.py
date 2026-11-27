@@ -97,7 +97,7 @@ from acuto.tracing import Tracer
 # Back-compat alias from v0.0.1 (FreeAgent was renamed to FreeFlow).
 FreeAgent = FreeFlow
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 # The SDK surface, in three tiers. Everything below stays importable from
 # ``acuto`` (nothing was removed); the tiers say what a user needs first.

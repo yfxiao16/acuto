@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "acuto"
-version = "0.1.0"
+version = "0.1.1"
 description = "A symbolic control layer for LLM agents: contracts over tool calls, compiled to automata that mask, route and verify every step"
 readme = "README.md"
 license = "Apache-2.0"
