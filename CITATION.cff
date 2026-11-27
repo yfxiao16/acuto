@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Acuto (Agentic Contract-based Runtime Orchestration): a symbolic control layer for LLM agents"
+authors:
+  - family-names: Xiao
+    given-names: Yifeng
+type: software
+repository-code: "https://github.com/yfxiao16/acuto"
+license: Apache-2.0

@@ -1,0 +1,154 @@
+"""OpenAI-compatible chat.completions adapter (no SDK dependency).
+
+Covers OpenAI and compatible endpoints via ``base_url``. Credentials come
+from ``api_key`` or the environment variable named by ``api_key_env``.
+Only the default OpenAI endpoint uses ``OPENAI_API_KEY`` implicitly."""
+
+from __future__ import annotations
+
+import json
+import os
+import time
+import urllib.error
+import urllib.request
+
+from acuto.envfile import setting
+from acuto.models.base import Model, ModelTurn, ToolCall
+
+_OPENAI_BASE_URL = "https://api.openai.com/v1"
+
+
+def _key_env_for_url(base_url: str, api_key_env: str | None) -> str | None:
+    if api_key_env is None and base_url.rstrip("/") == _OPENAI_BASE_URL:
+        return "OPENAI_API_KEY"
+    return api_key_env
+
+
+class OpenAICompatModel(Model):
+    def __init__(
+        self,
+        model: str = "gpt-4o-mini",
+        *,
+        base_url: str = _OPENAI_BASE_URL,
+        api_key: str | None = None,
+        api_key_env: str | None = None,
+        temperature: float | None = None,
+    ) -> None:
+        self.model = model
+        self.base_url = base_url.rstrip("/")
+        key_env = _key_env_for_url(self.base_url, api_key_env)
+        self.api_key = api_key or (os.environ.get(key_env, "") if key_env else "")
+        self.temperature = temperature
+
+    # -- neutral messages -> OpenAI messages --------------------------------
+    @staticmethod
+    def _to_messages(messages: list[dict], system: str | None) -> list[dict]:
+        out: list[dict] = []
+        if system:
+            out.append({"role": "system", "content": system})
+        for msg in messages:
+            role = msg["role"]
+            if role == "user":
+                out.append({"role": "user", "content": msg["content"]})
+            elif role == "assistant":
+                m: dict = {"role": "assistant", "content": msg.get("content")}
+                calls = msg.get("tool_calls", [])
+                if calls:
+                    m["tool_calls"] = [
+                        {
+                            "id": c["id"],
+                            "type": "function",
+                            "function": {"name": c["name"], "arguments": json.dumps(c["args"])},
+                        }
+                        for c in calls
+                    ]
+                out.append(m)
+            elif role == "tool":
+                out.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": msg["tool_call_id"],
+                        "content": msg["content"],
+                    }
+                )
+        return out
+
+    def _post(self, body: dict) -> dict:
+        url = f"{self.base_url}/chat/completions"
+        data = json.dumps(body).encode()
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        max_retries = int(setting("MODEL_MAX_RETRIES", "6"))
+        for attempt in range(max_retries):
+            req = urllib.request.Request(url, data=data, headers=headers)
+            try:
+                with urllib.request.urlopen(req, timeout=180) as r:
+                    return json.load(r)
+            except urllib.error.HTTPError as e:
+                raw = e.read().decode()
+                if e.code in (429, 500, 502, 503) and attempt < max_retries - 1:
+                    time.sleep(min(60, 2 * 2**attempt))
+                    continue
+                raise RuntimeError(f"OpenAI-compat HTTP {e.code}: {raw[:300]}") from e
+            except (urllib.error.URLError, TimeoutError, OSError):
+                if attempt < max_retries - 1:
+                    time.sleep(min(60, 2 * 2**attempt))
+                    continue
+                raise
+        raise RuntimeError("unreachable")
+
+    @staticmethod
+    def _sanitize_schema(schema):
+        """OpenAI rejects schemas whose ``required`` names properties that are
+        not defined (seen in third-party Bedrock-style toolspecs, which
+        tolerate it). Recursively drop such entries; never mutate the input."""
+        if isinstance(schema, list):
+            return [OpenAICompatModel._sanitize_schema(v) for v in schema]
+        if not isinstance(schema, dict):
+            return schema
+        out = {k: OpenAICompatModel._sanitize_schema(v) for k, v in schema.items()}
+        req, props = out.get("required"), out.get("properties")
+        if isinstance(req, list) and isinstance(props, dict):
+            out["required"] = [r for r in req if r in props]
+        return out
+
+    def generate(self, messages, tools, system=None) -> ModelTurn:
+        body: dict = {"model": self.model, "messages": self._to_messages(messages, system)}
+        if tools:
+            body["tools"] = [
+                {
+                    "type": "function",
+                    "function": {**t, "parameters": self._sanitize_schema(t.get("parameters"))},
+                }
+                for t in tools
+            ]
+        if self.temperature is not None:
+            body["temperature"] = self.temperature
+        resp = self._post(body)
+        choice = (resp.get("choices") or [{}])[0]
+        msg = choice.get("message", {})
+        calls = []
+        for c in msg.get("tool_calls") or []:
+            fn = c.get("function", {})
+            try:
+                args = json.loads(fn.get("arguments") or "{}")
+            except ValueError:
+                args = {}
+            calls.append(ToolCall(name=fn.get("name", ""), args=args, id=c.get("id", "")))
+        usage = resp.get("usage") or {}
+        return ModelTurn(
+            text=msg.get("content"),
+            tool_calls=calls,
+            raw=resp,
+            usage={
+                "prompt": usage.get("prompt_tokens", 0),
+                "completion": usage.get("completion_tokens", 0),
+                "total": usage.get("total_tokens", 0),
+                # Prefix-cache hits: dynamic tool exposure changes the tools
+                # block per step, which can invalidate provider prompt caches
+                # — measured so the schema-savings vs cache-hits trade-off is
+                # reportable (see RadixAttention discussion).
+                "cached": (usage.get("prompt_tokens_details") or {}).get("cached_tokens", 0),
+            },
+        )
